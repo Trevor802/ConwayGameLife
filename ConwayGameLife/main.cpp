@@ -1,4 +1,5 @@
 #include <SFML/Graphics.hpp>
+#include <cmath>
 #include <vector>
 
 void fillVerticeArray(const sf::Vector2f& anOrigin, const sf::Vector2f& aSize, float aSpacing, sf::VertexArray& outArray)
@@ -81,16 +82,24 @@ int main()
                 ourMousePressedX = event.mouseMove.x;
                 ourMousePressedY = event.mouseMove.y;
                 printf("move x: %.3f, y: %.3f\n", deltaX, deltaY);
+                printf("viewport left: %.3f, up: %.3f\n", view.getCenter().x - view.getSize().x / 2.f, 
+                       view.getCenter().y - view.getSize().y / 2.f);
             }
         }
         // Draw grid
         sf::VertexArray verticeArray;
         verticeArray.setPrimitiveType(sf::Lines);
-        fillVerticeArray(sf::Vector2f(0.f, 0.f), sf::Vector2f(ourWinWidth, ourWinHeight), kSpacing, verticeArray);
-        
+        float left = view.getCenter().x - view.getSize().x / 2.f;
+        float top = view.getCenter().y - view.getSize().y / 2.f;
+        fillVerticeArray(sf::Vector2f(floor(left / kSpacing) * kSpacing, floor(top / kSpacing) * kSpacing),
+                         sf::Vector2f(view.getSize().x + kSpacing, view.getSize().y + kSpacing), kSpacing, verticeArray);
+        // Draw tiles
+        sf::RectangleShape tile(sf::Vector2f(kSpacing, kSpacing));
+        tile.setPosition(sf::Vector2f(0.f, 0.f));
         // Core drawing
         window.clear();
         window.draw(verticeArray);
+        window.draw(tile);
         window.display();
     }
     return 0;
