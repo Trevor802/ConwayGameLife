@@ -2,7 +2,7 @@
 #include <cmath>
 #include <vector>
 
-void fillVerticeArray(const sf::Vector2f& anOrigin, const sf::Vector2f& aSize, float aSpacing, sf::VertexArray& outArray)
+static void fillVerticeArray(const sf::Vector2f& anOrigin, const sf::Vector2f& aSize, float aSpacing, sf::VertexArray& outArray)
 {
     int numHLines = aSize.y / aSpacing + 1, numVLines = aSize.x / aSpacing + 1;
     outArray.resize(2 * (numHLines + numVLines));
@@ -27,10 +27,23 @@ void fillVerticeArray(const sf::Vector2f& anOrigin, const sf::Vector2f& aSize, f
     }
 }
 
+static sf::Vector2f pect2Center(const sf::Vector2f& anOrigin, const sf::Vector2f& aSize)
+{
+    return sf::Vector2f(anOrigin.x / aSize.x - 0.5f, anOrigin.y / aSize.y - 0.5f);
+}
+
+static sf::Vector2f getWorldPos(const sf::Vector2f& aPect2Center, const sf::View& aView)
+{
+    auto center = aView.getCenter();
+    auto size = aView.getSize();
+    return sf::Vector2f(center.x + aPect2Center.x * size.x, center.y + aPect2Center.y * size.y);
+}
+
 int main()
 {
     const float kSpacing = 100.f;
     const float kScrollSpeed = 0.1f;
+    const float kMinScale = 1.f, kMaxScale = 10.f;
     float ourWinWidth = 800.f, ourWinHeight = 600.f;
     sf::RenderWindow window(sf::VideoMode (ourWinWidth, ourWinHeight), "Conway's Game of Life");
     sf::View view(sf::FloatRect(0.f, 0.f, ourWinWidth, ourWinHeight));
@@ -59,10 +72,19 @@ int main()
             if(event.type == sf::Event::MouseWheelScrolled)
             {
                 float scale = 1 - event.mouseWheelScroll.delta * kScrollSpeed;
+                float finalScale = ourScale * scale;
+                if(finalScale < kMinScale || finalScale > kMaxScale)
+                    continue;
+                auto mousePos = sf::Mouse::getPosition(window);
+                auto p2Center = pect2Center(sf::Vector2f(mousePos), sf::Vector2f(ourWinWidth, ourWinHeight));
+                auto preSize = view.getSize();
                 view.zoom(scale);
+                auto postSize = view.getSize();
+                auto sizeOffset = preSize - postSize;
+                view.setCenter(view.getCenter() + sf::Vector2f(sizeOffset.x * p2Center.x, sizeOffset.y * p2Center.y));
                 window.setView(view);
-                ourScale *= scale;
-                printf("wheel scrolled delta: %.3f\n", scale);
+                ourScale = finalScale;
+                printf("wheel scrolled delta: %.3f\n", ourScale);
             }
             if(event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Right)
             {
@@ -82,8 +104,6 @@ int main()
                 ourMousePressedX = event.mouseMove.x;
                 ourMousePressedY = event.mouseMove.y;
                 printf("move x: %.3f, y: %.3f\n", deltaX, deltaY);
-                printf("viewport left: %.3f, up: %.3f\n", view.getCenter().x - view.getSize().x / 2.f, 
-                       view.getCenter().y - view.getSize().y / 2.f);
             }
         }
         // Draw grid
