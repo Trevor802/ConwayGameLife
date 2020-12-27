@@ -49,14 +49,16 @@ int main()
     sf::View view(sf::FloatRect(0.f, 0.f, ourWinWidth, ourWinHeight));
     window.setView(view);
 
-    bool ourMouseRightHold = false;
+    bool ourMouseRightHold = false, ourMouseLeftHold = false;
     float ourMousePressedX, ourMousePressedY;
     float ourScale = 1.f;
     auto cmp = [](const sf::Vector2i& a, const sf::Vector2i& b)
     {
         return a.x < b.x || a.x == b.x && a.y < b.y;
     };
-    std::set<sf::Vector2i, decltype(cmp)> tiles(cmp);
+    std::set<sf::Vector2i, decltype(cmp)> ourTiles(cmp);
+    bool ourHasPlaced = false;
+    sf::Vector2i ourLastChangedTile;
 
     while(window.isOpen())
     {
@@ -119,21 +121,11 @@ int main()
                 printf("moved center x: %.3f, y: %.3f\n", view.getCenter().x, view.getCenter().y);
             }
             if(event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left)
+                ourMouseLeftHold = true;
+            if(event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Left)
             {
-                sf::Vector2f pos = getWorldPos(pect2Center(sf::Vector2f(event.mouseButton.x, event.mouseButton.y),
-                                               sf::Vector2f(ourWinWidth, ourWinHeight)), view);
-                sf::Vector2i index(floor(pos.x / kSpacing), floor(pos.y / kSpacing));
-                auto it = tiles.find(index);
-                if(it != tiles.end())
-                {
-                    tiles.erase(it);
-                    printf("remove tile x: %d, y: %d\n", index.x, index.y);
-                }
-                else
-                {
-                    tiles.insert(index);
-                    printf("new tile x: %d, y: %d\n", index.x, index.y);
-                }
+                ourMouseLeftHold = false;
+                ourHasPlaced = false;
             }
         }
         // Draw grid
@@ -143,11 +135,32 @@ int main()
         float top = view.getCenter().y - view.getSize().y / 2.f;
         fillVerticeArray(sf::Vector2f(floor(left / kSpacing) * kSpacing, floor(top / kSpacing) * kSpacing),
                          sf::Vector2f(view.getSize().x + kSpacing, view.getSize().y + kSpacing), kSpacing, verticeArray);
-        
+        if(ourMouseLeftHold)
+        {
+            sf::Vector2f pos = getWorldPos(pect2Center(sf::Vector2f(sf::Mouse::getPosition(window)),
+                                           sf::Vector2f(ourWinWidth, ourWinHeight)), view);
+            sf::Vector2i tile(floor(pos.x / kSpacing), floor(pos.y / kSpacing));
+            if(cmp(ourLastChangedTile, tile) || cmp(tile, ourLastChangedTile) || !ourHasPlaced)
+            {
+                auto it = ourTiles.find(tile);
+                if(it != ourTiles.end())
+                {
+                    ourTiles.erase(it);
+                    printf("remove tile x: %d, y: %d\n", tile.x, tile.y);
+                }
+                else
+                {
+                    ourTiles.insert(tile);
+                    printf("new tile x: %d, y: %d\n", tile.x, tile.y);
+                }
+                ourHasPlaced = true;
+            }
+            ourLastChangedTile = tile;
+        }
         // Core drawing
         window.clear();
         window.draw(verticeArray);
-        for(auto& tile : tiles)
+        for(auto& tile : ourTiles)
         {
             sf::RectangleShape tileShape(sf::Vector2f(kSpacing, kSpacing));
             tileShape.setPosition(sf::Vector2f(tile) * kSpacing);
