@@ -1,6 +1,6 @@
 #include <SFML/Graphics.hpp>
 #include <cmath>
-#include <vector>
+#include <set>
 
 static void fillVerticeArray(const sf::Vector2f& anOrigin, const sf::Vector2f& aSize, float aSpacing, sf::VertexArray& outArray)
 {
@@ -52,6 +52,11 @@ int main()
     bool ourMouseRightHold = false;
     float ourMousePressedX, ourMousePressedY;
     float ourScale = 1.f;
+    auto cmp = [](const sf::Vector2i& a, const sf::Vector2i& b)
+    {
+        return a.x < b.x || a.x == b.x && a.y < b.y;
+    };
+    std::set<sf::Vector2i, decltype(cmp)> tiles(cmp);
 
     while(window.isOpen())
     {
@@ -113,6 +118,23 @@ int main()
                 ourMousePressedY = event.mouseMove.y;
                 printf("moved center x: %.3f, y: %.3f\n", view.getCenter().x, view.getCenter().y);
             }
+            if(event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left)
+            {
+                sf::Vector2f pos = getWorldPos(pect2Center(sf::Vector2f(event.mouseButton.x, event.mouseButton.y),
+                                               sf::Vector2f(ourWinWidth, ourWinHeight)), view);
+                sf::Vector2i index(floor(pos.x / kSpacing), floor(pos.y / kSpacing));
+                auto it = tiles.find(index);
+                if(it != tiles.end())
+                {
+                    tiles.erase(it);
+                    printf("remove tile x: %d, y: %d\n", index.x, index.y);
+                }
+                else
+                {
+                    tiles.insert(index);
+                    printf("new tile x: %d, y: %d\n", index.x, index.y);
+                }
+            }
         }
         // Draw grid
         sf::VertexArray verticeArray;
@@ -121,13 +143,16 @@ int main()
         float top = view.getCenter().y - view.getSize().y / 2.f;
         fillVerticeArray(sf::Vector2f(floor(left / kSpacing) * kSpacing, floor(top / kSpacing) * kSpacing),
                          sf::Vector2f(view.getSize().x + kSpacing, view.getSize().y + kSpacing), kSpacing, verticeArray);
-        // Draw tiles
-        sf::RectangleShape tile(sf::Vector2f(kSpacing, kSpacing));
-        tile.setPosition(sf::Vector2f(0.f, 0.f));
+        
         // Core drawing
         window.clear();
         window.draw(verticeArray);
-        window.draw(tile);
+        for(auto& tile : tiles)
+        {
+            sf::RectangleShape tileShape(sf::Vector2f(kSpacing, kSpacing));
+            tileShape.setPosition(sf::Vector2f(tile) * kSpacing);
+            window.draw(tileShape);
+        }
         window.display();
     }
     return 0;
