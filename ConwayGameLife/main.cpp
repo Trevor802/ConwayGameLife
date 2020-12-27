@@ -66,15 +66,23 @@ int main()
             {
                 ourWinWidth = event.size.width;
                 ourWinHeight = event.size.height;
-                sf::FloatRect visibleArea(0.f, 0.f, event.size.width, event.size.height);
-                window.setView(sf::View(visibleArea));
+                view.setSize(ourWinWidth * ourScale, ourWinHeight * ourScale);
+                window.setView(view);
             }
             if(event.type == sf::Event::MouseWheelScrolled)
             {
                 float scale = 1 - event.mouseWheelScroll.delta * kScrollSpeed;
                 float finalScale = ourScale * scale;
-                if(finalScale < kMinScale || finalScale > kMaxScale)
-                    continue;
+                if(finalScale < kMinScale)
+                {
+                    finalScale = kMinScale;
+                    scale = kMinScale / ourScale;
+                }
+                else if(finalScale > kMaxScale)
+                {
+                    finalScale = kMaxScale;
+                    scale = kMaxScale / ourScale;
+                }
                 auto mousePos = sf::Mouse::getPosition(window);
                 auto p2Center = pect2Center(sf::Vector2f(mousePos), sf::Vector2f(ourWinWidth, ourWinHeight));
                 auto preSize = view.getSize();
@@ -84,14 +92,14 @@ int main()
                 view.setCenter(view.getCenter() + sf::Vector2f(sizeOffset.x * p2Center.x, sizeOffset.y * p2Center.y));
                 window.setView(view);
                 ourScale = finalScale;
-                printf("wheel scrolled delta: %.3f\n", ourScale);
+                printf("scolled global scale: %.3f\n", ourScale);
             }
             if(event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Right)
             {
                 ourMouseRightHold = true;
                 ourMousePressedX = event.mouseButton.x;
                 ourMousePressedY = event.mouseButton.y;
-                printf("right clicked x: %.3f, y: %.3f\n", ourMousePressedX, ourMousePressedY);
+                printf("right clicked pos x: %.3f, y: %.3f\n", ourMousePressedX, ourMousePressedY);
             }
             if(event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Right)
                 ourMouseRightHold = false;
@@ -103,7 +111,7 @@ int main()
                 window.setView(view);
                 ourMousePressedX = event.mouseMove.x;
                 ourMousePressedY = event.mouseMove.y;
-                printf("move x: %.3f, y: %.3f\n", deltaX, deltaY);
+                printf("moved center x: %.3f, y: %.3f\n", view.getCenter().x, view.getCenter().y);
             }
         }
         // Draw grid
