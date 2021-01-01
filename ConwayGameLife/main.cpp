@@ -1,7 +1,15 @@
 #include <SFML/Graphics.hpp>
 #include <cmath>
+#include <algorithm>
 #include <set>
 
+/// <summary>
+/// Get the grid lines positions
+/// </summary>
+/// <param name="anOrigin"></param>
+/// <param name="aSize"></param>
+/// <param name="aSpacing"></param>
+/// <param name="outArray">The output array of lines</param>
 static void fillVerticeArray(const sf::Vector2f& anOrigin, const sf::Vector2f& aSize, float aSpacing, sf::VertexArray& outArray)
 {
     int numHLines = aSize.y / aSpacing + 1, numVLines = aSize.x / aSpacing + 1;
@@ -27,16 +35,44 @@ static void fillVerticeArray(const sf::Vector2f& anOrigin, const sf::Vector2f& a
     }
 }
 
-static sf::Vector2f pect2Center(const sf::Vector2f& anOrigin, const sf::Vector2f& aSize)
+/// <summary>
+/// Transfer window coordinate to view coordinate
+/// </summary>
+/// <param name="anOrigin"></param>
+/// <param name="aSize"></param>
+/// <returns></returns>
+static sf::Vector2f win2View(const sf::Vector2f& aPosition, const sf::Vector2f& aWindowSize)
 {
-    return sf::Vector2f(anOrigin.x / aSize.x - 0.5f, anOrigin.y / aSize.y - 0.5f);
+    return sf::Vector2f(aPosition.x / aWindowSize.x - 0.5f, aPosition.y / aWindowSize.y - 0.5f);
 }
 
-static sf::Vector2f getWorldPos(const sf::Vector2f& aPect2Center, const sf::View& aView)
+/// <summary>
+/// Transfer view coordinate to world coordinate
+/// </summary>
+/// <param name="aPect2Center"></param>
+/// <param name="aView"></param>
+/// <returns></returns>
+static sf::Vector2f view2World(const sf::Vector2f& aPect2Center, const sf::View& aView)
 {
     auto center = aView.getCenter();
     auto size = aView.getSize();
     return sf::Vector2f(center.x + aPect2Center.x * size.x, center.y + aPect2Center.y * size.y);
+}
+
+/// <summary>
+/// Check if point is in range
+/// </summary>
+/// <param name="aPoint"></param>
+/// <param name="aRange"></param>
+/// <param name="anOrigin"></param>
+/// <returns></returns>
+template<typename T>
+static bool pointSanityCheck(const sf::Vector2<T>& aPoint, 
+                             const sf::Vector2<T>& aHalfRange, 
+                             const sf::Vector2<T>& aCenter = sf::Vector2<T>(0, 0))
+{
+    return aPoint.x >= aCenter.x - aHalfRange.x && aPoint.x < aCenter.x + aHalfRange.x
+        && aPoint.y >= aCenter.y - aHalfRange.y && aPoint.y < aCenter.y + aHalfRange.y;
 }
 
 int main()
@@ -44,6 +80,7 @@ int main()
     const float kSpacing = 100.f;
     const float kScrollSpeed = 0.1f;
     const float kMinScale = 1.f, kMaxScale = 10.f;
+    const unsigned char kSideLength = 10;
     float ourWinWidth = 800.f, ourWinHeight = 600.f;
     sf::RenderWindow window(sf::VideoMode (ourWinWidth, ourWinHeight), "Conway's Game of Life");
     sf::View view(sf::FloatRect(0.f, 0.f, ourWinWidth, ourWinHeight));
@@ -91,7 +128,7 @@ int main()
                     scale = kMaxScale / ourScale;
                 }
                 auto mousePos = sf::Mouse::getPosition(window);
-                auto p2Center = pect2Center(sf::Vector2f(mousePos), sf::Vector2f(ourWinWidth, ourWinHeight));
+                auto p2Center = win2View(sf::Vector2f(mousePos), sf::Vector2f(ourWinWidth, ourWinHeight));
                 auto preSize = view.getSize();
                 view.zoom(scale);
                 auto postSize = view.getSize();
@@ -131,31 +168,37 @@ int main()
         // Draw grid
         sf::VertexArray verticeArray;
         verticeArray.setPrimitiveType(sf::Lines);
-        float left = view.getCenter().x - view.getSize().x / 2.f;
-        float top = view.getCenter().y - view.getSize().y / 2.f;
+        float left = std::max(view.getCenter().x - view.getSize().x / 2.f, -kSideLength * kSpacing);
+        float top = std::max(view.getCenter().y - view.getSize().y / 2.f, -kSideLength * kSpacing);
+        float width = std::min(view.getCenter().x + view.getSize().x / 2.f + kSpacing, kSideLength * kSpacing) - left;
+        float height = std::min(view.getCenter().y + view.getSize().y / 2.f + kSpacing, kSideLength * kSpacing) - top;
         fillVerticeArray(sf::Vector2f(floor(left / kSpacing) * kSpacing, floor(top / kSpacing) * kSpacing),
-                         sf::Vector2f(view.getSize().x + kSpacing, view.getSize().y + kSpacing), kSpacing, verticeArray);
+                         sf::Vector2f(ceil(width / kSpacing) * kSpacing, ceil(height / kSpacing) * kSpacing),
+                         kSpacing, verticeArray);
         if(ourMouseLeftHold)
         {
-            sf::Vector2f pos = getWorldPos(pect2Center(sf::Vector2f(sf::Mouse::getPosition(window)),
+            sf::Vector2f pos = view2World(win2View(sf::Vector2f(sf::Mouse::getPosition(window)),
                                            sf::Vector2f(ourWinWidth, ourWinHeight)), view);
             sf::Vector2i tile(floor(pos.x / kSpacing), floor(pos.y / kSpacing));
-            if(cmp(ourLastChangedTile, tile) || cmp(tile, ourLastChangedTile) || !ourHasPlaced)
+            if(pointSanityCheck(tile, sf::Vector2i(kSideLength, kSideLength)))
             {
-                auto it = ourTiles.find(tile);
-                if(it != ourTiles.end())
+                if(cmp(ourLastChangedTile, tile) || cmp(tile, ourLastChangedTile) || !ourHasPlaced)
                 {
-                    ourTiles.erase(it);
-                    printf("remove tile x: %d, y: %d\n", tile.x, tile.y);
+                    auto it = ourTiles.find(tile);
+                    if(it != ourTiles.end())
+                    {
+                        ourTiles.erase(it);
+                        printf("remove tile x: %d, y: %d\n", tile.x, tile.y);
+                    }
+                    else
+                    {
+                        ourTiles.insert(tile);
+                        printf("new tile x: %d, y: %d\n", tile.x, tile.y);
+                    }
+                    ourHasPlaced = true;
                 }
-                else
-                {
-                    ourTiles.insert(tile);
-                    printf("new tile x: %d, y: %d\n", tile.x, tile.y);
-                }
-                ourHasPlaced = true;
+                ourLastChangedTile = tile;
             }
-            ourLastChangedTile = tile;
         }
         // Core drawing
         window.clear();
