@@ -13,6 +13,12 @@ struct TileComparator
 
 typedef std::set<sf::Vector2i, TileComparator> TileSet;
 
+/// <summary>
+/// Wrap the world up
+/// </summary>
+/// <param name="anInteger"></param>
+/// <param name="aModulo">The half length</param>
+/// <returns></returns>
 static int wrapInt(int anInteger, int aModulo)
 {
     return (anInteger + 3 * aModulo) % (2 * aModulo) - aModulo;
@@ -134,6 +140,10 @@ static void setTileLiveness(const sf::Vector2i& aTile, TileSet& someTiles, bool 
     }
 }
 
+/// <summary>
+/// Extend the boundary to include all potential live tiles
+/// </summary>
+/// <returns></returns>
 static void getProcessingTiles(const TileSet& someTiles, TileSet& someBoundaryTiles)
 {
     for(auto& tile : someTiles)
@@ -166,11 +176,16 @@ static void getProcessingTiles(const TileSet& someTiles, TileSet& someBoundaryTi
 
 enum GameState
 {
-    Editor,
-    Automata,
-    StepByStep
+    Editor, // Placing tiles
+    Automata, // Automatically running with a certain speed
+    StepByStep // Press once, do once
 };
 
+/// <summary>
+/// Double buffering
+/// </summary>
+/// <param name=""></param>
+/// <param name="someLastLiveTiles"></param>
 static void processCore(TileSet& someLastLiveTiles, TileSet& someLiveTiles)
 {
     std::swap(someLastLiveTiles, someLiveTiles);
